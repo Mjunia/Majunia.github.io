@@ -1,42 +1,62 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
   <title>カイル君のぶどう狩り</title>
   <style>
-    html, body {
+    body {
       margin: 0;
-      padding: 0;
-      overflow: hidden;
       background: white;
+      text-align: center;
     }
     canvas {
       display: block;
+      margin: auto;
       background: #87CEFA;
     }
     #ui {
-      position: absolute;
-      top: 10px;
-      width: 100%;
-      text-align: center;
+      margin: 10px;
     }
     button {
-      font-size: 1.2em;
-      padding: 5px 15px;
+      font-size: 1em;
+      padding: 5px 10px;
+      margin: 5px;
     }
-    #scoreDisplay, #gameOverMsg {
-      font-size: 1.2em;
+    #gameOverImage {
+      display: none;
+      position: absolute;
+      top: 30%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 200px;
+    }
+    #gameOverText {
+      display: none;
+      position: absolute;
+      top: 20%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      color: red;
+      font-size: 2em;
+      font-weight: bold;
     }
   </style>
 </head>
 <body>
-  <canvas id="gameCanvas"></canvas>
+  <h1>カイル君のぶどう狩り</h1>
+  <canvas id="gameCanvas" width="400" height="600"></canvas>
+
   <div id="ui">
+    <input id="playerName" placeholder="名前を入力" />
     <button id="startBtn">スタート</button>
+    <button id="showScoresBtn">スコア履歴表示</button>
+    <button id="clearScoresBtn">スコア履歴削除</button>
     <p id="scoreDisplay" style="display:none;">スコア: 0</p>
-    <p id="gameOverMsg" style="display:none; color:red; font-size:1.5em;">ゲームオーバー！</p>
     <button id="retryBtn" style="display:none;">リトライ</button>
   </div>
+
+  <div id="gameOverText">ゲームオーバー！</div>
+  <img id="gameOverImage" src="kairukun2.png" />
 
   <script>
     const canvas = document.getElementById('gameCanvas');
@@ -44,80 +64,45 @@
     const startBtn = document.getElementById('startBtn');
     const retryBtn = document.getElementById('retryBtn');
     const scoreDisplay = document.getElementById('scoreDisplay');
-    const gameOverMsg = document.getElementById('gameOverMsg');
+    const playerNameInput = document.getElementById('playerName');
+    const gameOverText = document.getElementById('gameOverText');
+    const gameOverImage = document.getElementById('gameOverImage');
+    const showScoresBtn = document.getElementById('showScoresBtn');
+    const clearScoresBtn = document.getElementById('clearScoresBtn');
 
-    let cw = window.innerWidth;
-    let ch = window.innerHeight;
-    canvas.width = cw;
-    canvas.height = ch;
-
-    let player, items, enemies, score, gameRunning, direction;
-    let spawnInterval = 2000;
-    const playerSpeed = 2;
-    let playerSizeGame = { width: cw * 0.1, height: ch * 0.15 };
-    let playerSizeStart = { width: cw * 0.25, height: ch * 0.4 };
-    const itemSpeed = 1.0;
-    const enemySpeed = 1.0;
-    let itemTimer, enemyTimer, difficultyTimer;
-    let inStartScreen = true;
-
-    const bgImage = new Image();
-    bgImage.src = 'haikei.png';
     const playerImg = new Image();
     playerImg.src = 'kaikun.png';
     const itemImg = new Image();
     itemImg.src = 'budou.png';
     const enemyImg = new Image();
     enemyImg.src = 'kemusi.png';
-    const gameOverImg = new Image();
-    gameOverImg.src = 'kairukun2.png';
 
-    bgImage.onload = () => {
-      drawStartScreen();
-    };
-
-    function drawStartScreen() {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.drawImage(bgImage, 0, 0, canvas.width, canvas.height);
-      ctx.fillStyle = 'black';
-      ctx.font = '16px Arial';
-      const lines = [
-        '甲斐のホテルのマスコットキャラクター「カイル君」',
-        '今日は山梨のぶどう狩りに来たよ♪',
-        '邪魔をする毛虫をよけてぶどうを食べよう！'
-      ];
-      lines.forEach((line, i) => {
-        const textWidth = ctx.measureText(line).width;
-        ctx.fillText(line, (canvas.width - textWidth) / 2, 100 + i * 30);
-      });
-      ctx.drawImage(
-        playerImg,
-        canvas.width - playerSizeStart.width - 20,
-        canvas.height - playerSizeStart.height - 20,
-        playerSizeStart.width,
-        playerSizeStart.height
-      );
-    }
+    let player, items, enemies, score, direction, gameRunning = false;
+    const playerSize = { width: 40, height: 60 };
+    const objectSize = { width: 50, height: 50 };
+    let spawnInterval = 2000;
+    const itemSpeed = 1;
+    const enemySpeed = 1;
+    let itemTimer, enemyTimer, difficultyTimer;
 
     function initGame() {
-      player = {
-        x: canvas.width / 2,
-        y: canvas.height - playerSizeGame.height - 20,
-        width: playerSizeGame.width,
-        height: playerSizeGame.height
-      };
+      player = { x: 180, y: 500, width: playerSize.width, height: playerSize.height };
       items = [];
       enemies = [];
       score = 0;
       direction = 1;
       gameRunning = true;
-      inStartScreen = false;
       spawnInterval = 2000;
 
       scoreDisplay.textContent = 'スコア: 0';
       scoreDisplay.style.display = 'block';
-      gameOverMsg.style.display = 'none';
       retryBtn.style.display = 'none';
+      gameOverText.style.display = 'none';
+      gameOverImage.style.display = 'none';
+      startBtn.style.display = 'none';
+      playerNameInput.style.display = 'none';
+      showScoresBtn.style.display = 'none';
+      clearScoresBtn.style.display = 'none';
 
       clearInterval(itemTimer);
       clearInterval(enemyTimer);
@@ -132,30 +117,32 @@
           enemyTimer = setInterval(spawnEnemy, spawnInterval);
         }
       }, 8000);
+
+      requestAnimationFrame(gameLoop);
     }
 
     function spawnItem() {
       items.push({
-        x: Math.random() * (canvas.width - 30),
-        y: -30,
-        width: 30,
-        height: 30,
+        x: Math.random() * (canvas.width - objectSize.width),
+        y: -objectSize.height,
+        width: objectSize.width,
+        height: objectSize.height,
         speed: itemSpeed
       });
     }
 
     function spawnEnemy() {
       enemies.push({
-        x: Math.random() * (canvas.width - 30),
-        y: -30,
-        width: 30,
-        height: 30,
+        x: Math.random() * (canvas.width - objectSize.width),
+        y: -objectSize.height,
+        width: objectSize.width,
+        height: objectSize.height,
         speed: enemySpeed
       });
     }
 
     function update() {
-      player.x += direction * playerSpeed;
+      player.x += direction * 2;
       if (player.x < 0 || player.x + player.width > canvas.width) {
         direction *= -1;
         player.x = Math.max(0, Math.min(player.x, canvas.width - player.width));
@@ -174,13 +161,14 @@
       enemies.forEach(e => e.y += e.speed);
       enemies = enemies.filter(e => e.y < canvas.height);
       enemies.forEach(e => {
-        if (checkCollision(player, e)) gameOver();
+        if (checkEnemyCollision(player, e)) {
+          endGame();
+        }
       });
     }
 
     function draw() {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.drawImage(bgImage, 0, 0, canvas.width, canvas.height);
       ctx.drawImage(playerImg, player.x, player.y, player.width, player.height);
       items.forEach(i => {
         ctx.drawImage(itemImg, i.x, i.y, i.width, i.height);
@@ -197,16 +185,6 @@
       requestAnimationFrame(gameLoop);
     }
 
-    function gameOver() {
-      gameRunning = false;
-      gameOverMsg.style.display = 'block';
-      retryBtn.style.display = 'inline-block';
-      clearInterval(itemTimer);
-      clearInterval(enemyTimer);
-      clearInterval(difficultyTimer);
-      ctx.drawImage(gameOverImg, canvas.width / 2 - 100, canvas.height / 2 - 100, 200, 200);
-    }
-
     function checkCollision(a, b) {
       return a.x < b.x + b.width &&
              a.x + a.width > b.x &&
@@ -214,35 +192,53 @@
              a.y + a.height > b.y;
     }
 
-    // タッチ操作で切り返し
-    canvas.addEventListener('touchstart', e => {
-      if (gameRunning) direction *= -1;
-    });
+    function checkEnemyCollision(a, b) {
+      // 当たり判定を緩くする（上下左右10pxの余裕）
+      return a.x + 10 < b.x + b.width &&
+             a.x + a.width - 10 > b.x &&
+             a.y + 10 < b.y + b.height &&
+             a.y + a.height - 10 > b.y;
+    }
 
-    // PCキーボードスペースで切り返し（念のため）
+    function endGame() {
+      gameRunning = false;
+      clearInterval(itemTimer);
+      clearInterval(enemyTimer);
+      clearInterval(difficultyTimer);
+      gameOverText.style.display = 'block';
+      gameOverImage.style.display = 'block';
+      retryBtn.style.display = 'inline-block';
+
+      const name = playerNameInput.value || 'ななし';
+      const history = JSON.parse(localStorage.getItem('scores') || '[]');
+      history.push({ name, score });
+      history.sort((a, b) => b.score - a.score);
+      localStorage.setItem('scores', JSON.stringify(history));
+    }
+
     window.addEventListener('keydown', e => {
-      if (e.key === ' ' && gameRunning) {
-        e.preventDefault(); // スクロール防止
-        direction *= -1;
-      }
+      if (e.key === ' ' && gameRunning) direction *= -1;
     });
 
     startBtn.addEventListener('click', () => {
-      if (inStartScreen) {
-        initGame();
-        gameLoop();
-      }
+      if (!gameRunning) initGame();
     });
 
     retryBtn.addEventListener('click', () => {
       initGame();
-      gameLoop();
     });
 
-    // 画面リサイズ時も再調整（任意）
-    window.addEventListener('resize', () => {
-      canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight;
+    showScoresBtn.addEventListener('click', () => {
+      const history = JSON.parse(localStorage.getItem('scores') || '[]');
+      const list = history.map(h => `${h.name}: ${h.score}`).join('\n');
+      alert("スコア履歴:\n" + (list || "なし"));
+    });
+
+    clearScoresBtn.addEventListener('click', () => {
+      if (confirm("スコア履歴をすべて削除しますか？")) {
+        localStorage.removeItem('scores');
+        alert("スコア履歴を削除しました");
+      }
     });
   </script>
 </body>
