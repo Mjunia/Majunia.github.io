@@ -1,28 +1,41 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="UTF-8">
   <title>カイル君のぶどう狩り</title>
   <style>
-    body { text-align: center; margin: 0; background: #fff; }
-    canvas { display: block; margin: 0 auto; background: #87CEFA; }
-    #ui { margin-top: 10px; }
-    button { font-size: 1.2em; padding: 5px 15px; }
-    #gameOverMsg { color: red; font-size: 2em; font-weight: bold; margin-top: 20px; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      background: white;
+    }
+    canvas {
+      display: block;
+      background: #87CEFA;
+    }
+    #ui {
+      position: absolute;
+      top: 10px;
+      width: 100%;
+      text-align: center;
+    }
+    button {
+      font-size: 1.2em;
+      padding: 5px 15px;
+    }
+    #scoreDisplay, #gameOverMsg {
+      font-size: 1.2em;
+    }
   </style>
 </head>
 <body>
-  <h1>カイル君のぶどう狩り</h1>
-  <canvas id="gameCanvas" width="400" height="600"></canvas>
+  <canvas id="gameCanvas"></canvas>
   <div id="ui">
-    <input type="text" id="playerName" placeholder="名前を入力してください" style="font-size:1.2em; padding:5px; width:200px;" />
     <button id="startBtn">スタート</button>
-    <button id="showScoresBtn">スコアを見る</button>
     <p id="scoreDisplay" style="display:none;">スコア: 0</p>
-    <p id="gameOverMsg" style="display:none;"></p>
+    <p id="gameOverMsg" style="display:none; color:red; font-size:1.5em;">ゲームオーバー！</p>
     <button id="retryBtn" style="display:none;">リトライ</button>
-    <button id="resetScoresBtn" style="display:none;">スコアリセット</button>
-    <div id="scoreHistory" style="display:none; margin-top:15px; max-height:200px; overflow-y:auto; text-align:left; width: 200px; margin-left:auto; margin-right:auto;"></div>
   </div>
 
   <script>
@@ -32,17 +45,17 @@
     const retryBtn = document.getElementById('retryBtn');
     const scoreDisplay = document.getElementById('scoreDisplay');
     const gameOverMsg = document.getElementById('gameOverMsg');
-    const playerNameInput = document.getElementById('playerName');
-    const showScoresBtn = document.getElementById('showScoresBtn');
-    const scoreHistoryDiv = document.getElementById('scoreHistory');
-    const resetScoresBtn = document.getElementById('resetScoresBtn');
+
+    let cw = window.innerWidth;
+    let ch = window.innerHeight;
+    canvas.width = cw;
+    canvas.height = ch;
 
     let player, items, enemies, score, gameRunning, direction;
-    let spawnIntervalDefault = 2000;
-    let spawnInterval;
+    let spawnInterval = 2000;
     const playerSpeed = 2;
-    const playerSizeGame = { width: 40, height: 60 };
-    const playerSizeStart = { width: 90, height: 135 };
+    let playerSizeGame = { width: cw * 0.1, height: ch * 0.15 };
+    let playerSizeStart = { width: cw * 0.25, height: ch * 0.4 };
     const itemSpeed = 1.0;
     const enemySpeed = 1.0;
     let itemTimer, enemyTimer, difficultyTimer;
@@ -52,12 +65,12 @@
     bgImage.src = 'haikei.png';
     const playerImg = new Image();
     playerImg.src = 'kaikun.png';
-    const playerGameOverImg = new Image();
-    playerGameOverImg.src = 'kairukun2.png';
     const itemImg = new Image();
     itemImg.src = 'budou.png';
     const enemyImg = new Image();
     enemyImg.src = 'kemusi.png';
+    const gameOverImg = new Image();
+    gameOverImg.src = 'kairukun2.png';
 
     bgImage.onload = () => {
       drawStartScreen();
@@ -66,8 +79,8 @@
     function drawStartScreen() {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.drawImage(bgImage, 0, 0, canvas.width, canvas.height);
-      ctx.font = '16px Arial';
       ctx.fillStyle = 'black';
+      ctx.font = '16px Arial';
       const lines = [
         '甲斐のホテルのマスコットキャラクター「カイル君」',
         '今日は山梨のぶどう狩りに来たよ♪',
@@ -77,30 +90,34 @@
         const textWidth = ctx.measureText(line).width;
         ctx.fillText(line, (canvas.width - textWidth) / 2, 100 + i * 30);
       });
-      ctx.drawImage(playerImg, canvas.width - playerSizeStart.width - 10, canvas.height - playerSizeStart.height - 10, playerSizeStart.width, playerSizeStart.height);
+      ctx.drawImage(
+        playerImg,
+        canvas.width - playerSizeStart.width - 20,
+        canvas.height - playerSizeStart.height - 20,
+        playerSizeStart.width,
+        playerSizeStart.height
+      );
     }
 
     function initGame() {
-      if (!playerNameInput.value.trim()) {
-        alert('名前を入力してください');
-        return false;
-      }
-
-      player = { x: 200, y: 500, width: playerSizeGame.width, height: playerSizeGame.height };
+      player = {
+        x: canvas.width / 2,
+        y: canvas.height - playerSizeGame.height - 20,
+        width: playerSizeGame.width,
+        height: playerSizeGame.height
+      };
       items = [];
       enemies = [];
       score = 0;
       direction = 1;
       gameRunning = true;
       inStartScreen = false;
-      spawnInterval = spawnIntervalDefault;
+      spawnInterval = 2000;
 
       scoreDisplay.textContent = 'スコア: 0';
       scoreDisplay.style.display = 'block';
       gameOverMsg.style.display = 'none';
       retryBtn.style.display = 'none';
-      resetScoresBtn.style.display = 'none';
-      scoreHistoryDiv.style.display = 'none';
 
       clearInterval(itemTimer);
       clearInterval(enemyTimer);
@@ -115,16 +132,26 @@
           enemyTimer = setInterval(spawnEnemy, spawnInterval);
         }
       }, 8000);
-
-      return true;
     }
 
     function spawnItem() {
-      items.push({ x: Math.random() * (canvas.width - 30), y: -30, width: 30, height: 30, speed: itemSpeed });
+      items.push({
+        x: Math.random() * (canvas.width - 30),
+        y: -30,
+        width: 30,
+        height: 30,
+        speed: itemSpeed
+      });
     }
 
     function spawnEnemy() {
-      enemies.push({ x: Math.random() * (canvas.width - 30), y: -30, width: 30, height: 30, speed: enemySpeed });
+      enemies.push({
+        x: Math.random() * (canvas.width - 30),
+        y: -30,
+        width: 30,
+        height: 30,
+        speed: enemySpeed
+      });
     }
 
     function update() {
@@ -136,52 +163,31 @@
 
       items.forEach(i => i.y += i.speed);
       items = items.filter(i => i.y < canvas.height);
-
-      for (let i = items.length - 1; i >= 0; i--) {
-        if (checkCollision(player, items[i])) {
+      items.forEach((i, idx) => {
+        if (checkCollision(player, i)) {
           score += 10;
           scoreDisplay.textContent = 'スコア: ' + score;
-          items.splice(i, 1);
+          items.splice(idx, 1);
         }
-      }
+      });
 
       enemies.forEach(e => e.y += e.speed);
       enemies = enemies.filter(e => e.y < canvas.height);
-
-      for (let i = enemies.length - 1; i >= 0; i--) {
-        if (checkCollisionEnemy(player, enemies[i])) {
-          gameOver();
-        }
-      }
+      enemies.forEach(e => {
+        if (checkCollision(player, e)) gameOver();
+      });
     }
 
     function draw() {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.drawImage(bgImage, 0, 0, canvas.width, canvas.height);
-
-      if (player) {
-        ctx.drawImage(playerImg, player.x, player.y, player.width, player.height);
-      }
-
+      ctx.drawImage(playerImg, player.x, player.y, player.width, player.height);
       items.forEach(i => {
-        if (i) ctx.drawImage(itemImg, i.x, i.y, i.width, i.height);
+        ctx.drawImage(itemImg, i.x, i.y, i.width, i.height);
       });
-
       enemies.forEach(e => {
-        if (e) ctx.drawImage(enemyImg, e.x, e.y, e.width, e.height);
+        ctx.drawImage(enemyImg, e.x, e.y, e.width, e.height);
       });
-
-      if (!gameRunning && player) {
-        ctx.fillStyle = 'red';
-        ctx.font = '36px Arial';
-        const msg = 'ゲームオーバー！';
-        const textWidth = ctx.measureText(msg).width;
-        ctx.fillText(msg, (canvas.width - textWidth) / 2, canvas.height / 2 - 40);
-
-        const imgW = 180;
-        const imgH = 270;
-        ctx.drawImage(playerGameOverImg, (canvas.width - imgW) / 2, canvas.height / 2, imgW, imgH);
-      }
     }
 
     function gameLoop() {
@@ -195,15 +201,10 @@
       gameRunning = false;
       gameOverMsg.style.display = 'block';
       retryBtn.style.display = 'inline-block';
-      resetScoresBtn.style.display = 'inline-block';
-
-      saveScore(playerNameInput.value.trim(), score);
-
       clearInterval(itemTimer);
       clearInterval(enemyTimer);
       clearInterval(difficultyTimer);
-
-      draw();
+      ctx.drawImage(gameOverImg, canvas.width / 2 - 100, canvas.height / 2 - 100, 200, 200);
     }
 
     function checkCollision(a, b) {
@@ -213,72 +214,35 @@
              a.y + a.height > b.y;
     }
 
-    function checkCollisionEnemy(a, b) {
-      const margin = 10;
-      return a.x + margin < b.x + b.width - margin &&
-             a.x + a.width - margin > b.x + margin &&
-             a.y + margin < b.y + b.height - margin &&
-             a.y + a.height - margin > b.y + margin;
-    }
+    // タッチ操作で切り返し
+    canvas.addEventListener('touchstart', e => {
+      if (gameRunning) direction *= -1;
+    });
 
-    function saveScore(name, score) {
-      const scores = JSON.parse(localStorage.getItem('scoreHistory') || '[]');
-      scores.push({ name, score });
-      scores.sort((a, b) => b.score - a.score);
-      localStorage.setItem('scoreHistory', JSON.stringify(scores));
-    }
-
-    function loadScores() {
-      return JSON.parse(localStorage.getItem('scoreHistory') || '[]');
-    }
-
-    function showScores() {
-      const scores = loadScores();
-      if (scores.length === 0) {
-        scoreHistoryDiv.textContent = 'スコア履歴はありません';
-      } else {
-        scoreHistoryDiv.innerHTML = scores.map(s => `${s.name}: ${s.score}`).join('<br>');
+    // PCキーボードスペースで切り返し（念のため）
+    window.addEventListener('keydown', e => {
+      if (e.key === ' ' && gameRunning) {
+        e.preventDefault(); // スクロール防止
+        direction *= -1;
       }
-      scoreHistoryDiv.style.display = 'block';
-      resetScoresBtn.style.display = 'inline-block';
-    }
-
-    function resetScores() {
-      if (confirm('スコア履歴をリセットしますか？')) {
-        localStorage.removeItem('scoreHistory');
-        scoreHistoryDiv.textContent = '';
-        scoreHistoryDiv.style.display = 'none';
-        resetScoresBtn.style.display = 'none';
-      }
-    }
+    });
 
     startBtn.addEventListener('click', () => {
-      if (initGame()) {
+      if (inStartScreen) {
+        initGame();
         gameLoop();
       }
     });
 
     retryBtn.addEventListener('click', () => {
-      if (initGame()) {
-        gameLoop();
-      }
+      initGame();
+      gameLoop();
     });
 
-    showScoresBtn.addEventListener('click', () => {
-      showScores();
-    });
-
-    resetScoresBtn.addEventListener('click', () => {
-      resetScores();
-    });
-
-    window.addEventListener('keydown', (e) => {
-      if (e.code === 'Space') {
-        if (gameRunning) {
-          e.preventDefault();
-          direction *= -1;  // スペースキーで切り返し
-        }
-      }
+    // 画面リサイズ時も再調整（任意）
+    window.addEventListener('resize', () => {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
     });
   </script>
 </body>
